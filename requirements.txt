@@ -1,0 +1,8 @@
+torch==2.0.1
+torchvision==0.15.2
+ccxt==2.10.59
+pandas==2.0.3
+numpy==1.25.0
+h5py==3.9.0
+pyarrow==12.0.1
+pathlib==1.0.1
