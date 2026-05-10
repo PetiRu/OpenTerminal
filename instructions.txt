@@ -1,0 +1,116 @@
+# Instructions to Generate a Cryptocurrency Forecasting System
+
+**System Overview:**
+This is a complete system designed for forecasting cryptocurrency prices based on historical OHLCV data. The project is production-ready and follows structured modules for data downloading, preprocessing, training, global evaluation, and inference.
+
+**Machine Setup Requirements:**
+- NVIDIA GPU with 14 GB VRAM.
+- 55 GB RAM.
+- Intel i7-14700KF CPU.
+- PyTorch framework with mixed precision (FP16).
+- HDF5 with memory mapping for efficient data handling.
+- CCXT library for fetching cryptocurrency data.
+
+**Modules to Implement:**
+
+## File 1: config.py
+Central configuration file containing:
+- File paths.
+- List of 500 cryptocurrency symbols.
+- Feature settings.
+- Training hyperparameters.
+
+---
+
+## File 2: downloader.py
+Responsible for downloading OHLCV data.
+### Key Responsibilities:
+- Use CCXT to fetch data for 500 cryptocurrency spot pairs (e.g., BTC/USDT, ETH/USDT, etc.) from Binance.
+- Data spans from `2020-01-01` to the present.
+- Store raw data as Parquet files, arranged as one file per symbol per timeframe.
+- Implement robust rate limiting and recovery mechanisms to handle missing data.
+
+---
+
+## File 3: preprocess.py
+### Tasks:
+- Process Parquet files into 40-hour feature blocks for each symbol.
+- For each timeframe (1m, 5m, 15m, 1h, 4h), generate aligned and time-synchronized feature blocks.
+- Save processed data into HDF5 files (`tokens/{SYMBOL}/target_{TF}/windows.h5`).
+
+---
+
+## File 4: model.py
+Provides the `MultiHorizonModel` class for inference and training.
+### Architecture:
+- Input: `(N, F)` shaped tensors where F ~ 120 features.
+- Layers:
+  - Conv1D layers with LayerNorm and GELU activations.
+  - BiLSTM with dropout (two layers).
+  - Multi-head attention mechanism.
+  - Residual connection.
+  - Dense network outputting predictions for horizons (1, 5, 10, 20, 50, 100 candles).
+- Supports variable-length sequences dynamically.
+
+---
+
+## File 5: trainer.py
+### Constructs a Walk-Forward Training Procedure:
+- Class: `GroupTrainer`.
+- Reads input 40-hour blocks in chronological order from HDF5 files.
+- Online-learning with blocks acting as steps.
+- Checkpointing every 1000 blocks (or configurable).
+- Implements gradient scaling via torch.cuda.amp (FP16 support).
+- Supports command-line options for:
+  - `--symbols_list`: TXT file list of symbols.
+  - `--target_tf`: Target timeframe.
+  - `--group_id`: Identifier for the model group.
+  - `--resume`: Path to a previous checkpoint.
+
+---
+
+## File 6: evaluate_global.py
+### Tasks:
+- Loads all trained models across groups and evaluates their performance on fixed holdout blocks.
+- Identifies the best-performing model for each timeframe.
+- Produces a JSON file (`mapping.json`) storing mappings:
+  - Token-to-group assignments.
+  - Selected best-performing models.
+
+---
+
+## File 7: inference.py
+### Tasks:
+- Class: `InferenceEngine`.
+- Initializes a pipeline that predicts price returns for input feature blocks.
+- Dynamically loads and caches relevant models.
+- Aggregates predictions from the best-performing models for the specified timeframe and token.
+
+---
+
+## File 8: run_pipeline.py
+### Tasks:
+- Runs the entire pipeline end-to-end:
+  - Data download (calls `downloader.py`).
+  - Data preprocessing (calls `preprocess.py`).
+  - Model training (calls `trainer.py`).
+  - Global evaluation (calls `evaluate_global.py`).
+- Supports restart and selective execution of individual modules via CLI arguments.
+
+---
+
+**General Development Notes:**
+- Ensure all file paths use cross-platform compatible libraries (`pathlib`, `os.path`).
+- Minimize memory usage; use HDF5 with memory mapping.
+- Fully document each function, class, and module.
+
+---
+
+**Deliverables:**
+- All modules described above must be provided as Python scripts.
+- `requirements.txt` listing explicit library versions.
+- Code should be runnable and implement logging for progress.
+
+---
+
+Follow these specifications for generating the system.
